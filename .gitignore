@@ -9,6 +9,7 @@ baml_client
 .vscode
 .claude
 CLAUDE.md
+.windsurfrules
 
 # misc
 .env
