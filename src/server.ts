@@ -1,5 +1,5 @@
 import express from 'express';
-import { Thread, agentLoop } from './agents/agent';
+import { Thread, agentLoop } from './agents/assistant';
 import { ThreadStore } from '../src/state';
 
 const app = express();
