@@ -1,5 +1,5 @@
 import { b } from "../baml_client";
-import type { AddTool, SubtractTool, MultiplyTool, DivideTool } from "../baml_client";
+import { calculatorToolHandlers } from "./tools/calculator";
 
 export interface Event {
     type: string
@@ -47,44 +47,27 @@ ${body}
     }
 }
 
-export type CalculatorTool = AddTool | SubtractTool | MultiplyTool | DivideTool;
+// Generic tool handling -------------------------------------------------------------------
+type ToolHandler = (step: any) => any;
 
-export async function handleNextStep(nextStep: CalculatorTool, thread: Thread): Promise<Thread> {
-    let result: number;
-    switch (nextStep.intent) {
-        case "add":
-            result = nextStep.a + nextStep.b;
-            console.log("tool_response", result);
-            thread.events.push({
-                "type": "tool_response",
-                "data": result
-            });
-            return thread;
-        case "subtract":
-            result = nextStep.a - nextStep.b;
-            console.log("tool_response", result);
-            thread.events.push({
-                "type": "tool_response",
-                "data": result
-            });
-            return thread;
-        case "multiply":
-            result = nextStep.a * nextStep.b;
-            console.log("tool_response", result);
-            thread.events.push({
-                "type": "tool_response",
-                "data": result
-            });
-            return thread;
-        case "divide":
-            result = nextStep.a / nextStep.b;
-            console.log("tool_response", result);
-            thread.events.push({
-                "type": "tool_response",
-                "data": result
-            });
-            return thread;
+// Aggregate all tool handlers here. To add new tools, simply spread their handlers into this map.
+const toolHandlers: Record<string, ToolHandler> = {
+    ...calculatorToolHandlers,
+};
+
+async function handleTool(step: any, thread: Thread): Promise<Thread> {
+    const handler = toolHandlers[step.intent as string];
+    if (handler) {
+        const result = handler(step);
+        console.log("tool_response", result);
+        thread.events.push({
+            type: "tool_response",
+            data: result,
+        });
+    } else {
+        console.warn(`Unhandled tool intent: ${step.intent}`);
     }
+    return thread;
 }
 
 export async function agentLoop(initialThread: Thread): Promise<Thread> {
@@ -105,11 +88,8 @@ export async function agentLoop(initialThread: Thread): Promise<Thread> {
             case "request_more_information":
                 // response to human, return the next step object
                 return thread;
-            case "add":
-            case "subtract":
-            case "multiply":
-            case "divide":
-                thread = await handleNextStep(nextStep, thread);
+            default:
+                thread = await handleTool(nextStep, thread);
         }
     }
 }
