@@ -1,5 +1,6 @@
 import { b } from "../baml_client";
 import { calculatorToolHandlers } from "./tools/calculator";
+import { thinkToolHandler } from "./tools/think";
 
 export interface Event {
     type: string
@@ -53,6 +54,7 @@ type ToolHandler = (step: any) => any;
 // Aggregate all tool handlers here. To add new tools, simply spread their handlers into this map.
 const toolHandlers: Record<string, ToolHandler> = {
     ...calculatorToolHandlers,
+    ...thinkToolHandler,
 };
 
 async function handleTool(step: any, thread: Thread): Promise<Thread> {
@@ -79,17 +81,22 @@ export async function agentLoop(initialThread: Thread): Promise<Thread> {
         console.log("nextStep", nextStep);
 
         thread.events.push({
-            "type": "tool_call",
+            "type": "tool_call", // Log the tool call itself
             "data": nextStep
         });
 
         switch (nextStep.intent) {
             case "done_for_now":
             case "request_more_information":
-                // response to human, return the next step object
+                // These intents require human interaction, so we return the thread state.
                 return thread;
+            // REMOVED the think case here - it should fall through to default
             default:
+                // Handle other tools (including 'think')
                 thread = await handleTool(nextStep, thread);
+                // After handling a tool (like 'think' or 'add'),
+                // the loop continues to determine the *next* step.
+                break; // Explicitly break to continue the while loop
         }
     }
 }

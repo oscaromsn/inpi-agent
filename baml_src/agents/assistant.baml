@@ -16,13 +16,19 @@ class DoneForNow {
 
 function DetermineNextStep(
     thread: string 
-) -> HumanTools | CalculatorTools {
+) -> HumanTools | CalculatorTools | ThinkTools {
     client "openai/gpt-4o"
 
     prompt #"
         {{ _.role("system") }}
 
         You are a helpful assistant that can help with tasks.
+
+        You can use the following tools:
+        
+        - Calculator tools (add, subtract, multiply, divide)
+
+        Sometimes, you may need to think through a problem step-by-step before acting. Use the 'think' tool for this internal reasoning. It helps you plan complex tasks or break down problems. It does *not* interact with the user or external systems. After thinking, decide on the next concrete action (like using the calculator or asking the user).
 
         {{ _.role("user") }}
 
