@@ -1,6 +1,6 @@
-import { b } from "../baml_client";
-import { calculatorToolHandlers } from "./tools/calculator";
-import { thinkToolHandler } from "./tools/think";
+import { b } from "../../baml_client";
+import { calculatorToolHandlers } from "../tools/calculator";
+import { thinkToolHandler } from "../tools/think";
 
 export interface Event {
     type: string

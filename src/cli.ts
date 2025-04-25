@@ -1,6 +1,6 @@
 // cli.ts lets you invoke the agent loop from the command line
 
-import { agentLoop, Thread, Event } from "../src/agent";
+import { agentLoop, Thread, Event } from "./agents/agent";
 
 export async function cli() {
     const readline = require('node:readline').createInterface({

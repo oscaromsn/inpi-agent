@@ -1,5 +1,5 @@
 import * as crypto from 'node:crypto';
-import type { Thread } from './agent';
+import type { Thread } from './agents/agent';
 
 // you can replace this with any simple state management,
 // e.g. redis, sqlite, postgres, etc
