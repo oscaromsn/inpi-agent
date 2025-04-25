@@ -1,0 +1,18 @@
+# node
+node_modules
+
+# baml
+baml_client
+
+# IDEs
+.idea
+.vscode
+.claude
+CLAUDE.md
+
+# misc
+.env
+.env.local
+
+# mac
+.DS_Store
