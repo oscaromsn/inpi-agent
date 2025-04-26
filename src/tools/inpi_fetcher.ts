@@ -3,8 +3,11 @@ import type { AxiosInstance } from "axios";
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
 import { ThreadStore } from "../state"; // Import ThreadStore to access static cache methods
+import type { FetchInpiDataTool, FilterInpiResultsTool, GetInpiDetailsTool, FindMostRecentTrademarkTool } from "../../baml_client"; // Import BAML tool types
 
-// Interfaces matching BAML classes
+// --- Interfaces for Data Structures ---
+
+// Matches BAML class TrademarkEntry
 export interface TrademarkEntry {
   Numero: string | null;
   Prioridade: string | null;
@@ -15,51 +18,84 @@ export interface TrademarkEntry {
   URL: string | null;
 }
 
-// Represents the full results stored in cache
-export interface InpiScraperResults {
+// Represents the full raw results stored in cache
+interface InpiRawResults {
   trademarks: TrademarkEntry[];
   errors: string[];
 }
 
-// Represents the summary returned to the LLM after initial fetch
-export interface InpiFetchSummary {
-    result_id: string;
-    summary: string;
+// --- Interfaces for Tool Handler Results (with serialization method) ---
+
+interface LLMSerializable {
+    toLLMString(): string;
 }
 
-// Type for the input step for fetchInpiData
-interface FetchInpiDataInput {
-    intent: "fetch_inpi_data";
-    marca: string;
+// Result of fetch_inpi_data handler
+export class InpiFetchSummary implements LLMSerializable {
+    type = 'inpi_fetch_summary' as const;
+    constructor(public result_id: string, public summary: string) {}
+
+    toLLMString(): string {
+        return `result_id: ${this.result_id}\nsummary: ${this.summary}`;
+    }
 }
 
-// Type for the input step for filterInpiResults
-interface FilterInpiResultsInput {
-    intent: "filter_inpi_results";
-    result_id: string;
-    situacao?: string | null;
-    titular?: string | null;
-    classe_ncl?: string | null;
+// Result of filter_inpi_results handler
+export class InpiFilteredResults implements LLMSerializable {
+    type = 'inpi_filtered_results' as const;
+    constructor(public trademarks: TrademarkEntry[], public errors: string[]) {}
+
+    toLLMString(): string {
+        const summary: string[] = [];
+        if (this.trademarks.length > 0) {
+            summary.push(`Found ${this.trademarks.length} matching trademark(s):`);
+            // Show details of the filtered results (up to a limit)
+            for (const t of this.trademarks.slice(0, 5)) { // Show more details for filtered results
+                summary.push(`- Numero: ${t.Numero ?? 'N/A'}, Marca: ${t.Marca ?? 'N/A'}, Situacao: ${t.Situacao ?? 'N/A'}, Titular: ${t.Titular ?? 'N/A'}`);
+            }
+            if (this.trademarks.length > 5) {
+                summary.push(`... (and ${this.trademarks.length - 5} more)`);
+            }
+        } else {
+            summary.push("No trademarks matched the filter criteria.");
+        }
+        if (this.errors.length > 0) {
+            summary.push(`Errors encountered: ${this.errors.join(', ')}`);
+        }
+        return summary.join('\n');
+    }
 }
 
-// Type for the input step for getInpiDetails
-interface GetInpiDetailsInput {
-    intent: "get_inpi_details";
-    result_id: string;
-    numero: string;
+// Result of get_inpi_details or find_most_recent_trademark handler (success case)
+export class TrademarkEntryResult implements LLMSerializable {
+    type = 'inpi_trademark_entry' as const;
+    constructor(public trademark: TrademarkEntry) {}
+
+    toLLMString(): string {
+        const entry = this.trademark;
+        return `Details for Numero ${entry.Numero}:\n` +
+               `  Marca: ${entry.Marca ?? 'N/A'}\n` +
+               `  Situacao: ${entry.Situacao ?? 'N/A'}\n` +
+               `  Titular: ${entry.Titular ?? 'N/A'}\n` +
+               `  Classes: ${entry.Classes?.join(', ') ?? 'N/A'}\n` +
+               `  URL: ${entry.URL ?? 'N/A'}`;
+    }
 }
 
-// Type for the input step for findMostRecentTrademark
-interface FindMostRecentTrademarkInput {
-    intent: "find_most_recent_trademark";
-    result_id: string;
+// Result type for errors from INPI tools
+export class InpiErrorResult implements LLMSerializable {
+    type = 'inpi_error' as const;
+    constructor(public error: string) {}
+
+    toLLMString(): string {
+        return `Error: ${this.error}`;
+    }
 }
 
+// Union type for all possible INPI handler results
+export type InpiHandlerResult = InpiFetchSummary | InpiFilteredResults | TrademarkEntryResult | InpiErrorResult;
 
-/**
- * Extract the total number of pages from the response content.
- */
-
+// --- Helper Functions (Scraping, Parsing, Date) ---
 
 /**
  * Extract the total number of pages from the response content.
@@ -103,9 +139,8 @@ function cleanClasses(classeText: string): string[] {
  * Scrapes INPI for trademark data across all pages.
  * Returns the full raw results.
  */
-async function scrapeAllInpiData(marca: string): Promise<InpiScraperResults> {
+async function scrapeAllInpiData(marca: string): Promise<InpiRawResults> {
     const jar = new CookieJar();
-    // Cast config to any to allow 'jar' option in axios.create
     const rawClient = axios.create({ jar, withCredentials: true, timeout: 30000, headers: { /* User-Agent */ } } as any);
     const client: AxiosInstance = wrapper(rawClient as any) as AxiosInstance;
 
@@ -113,27 +148,38 @@ async function scrapeAllInpiData(marca: string): Promise<InpiScraperResults> {
     const errors: string[] = [];
     const initialUrl = "https://busca.inpi.gov.br/pePI/servlet/LoginController?action=login";
     const searchUrl = "https://busca.inpi.gov.br/pePI/servlet/MarcasServletController";
-    const headers = { /* Content-Type, Referer, User-Agent, Origin */ };
+    const headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36', // Example User-Agent
+        'Referer': 'https://busca.inpi.gov.br/pePI/jsp/marcas/Pesquisa_classe_basica.jsp',
+        'Origin': 'https://busca.inpi.gov.br'
+    };
 
     try {
         await client.get(initialUrl); // Start session
 
-        const searchData = new URLSearchParams({ /* Initial search params */
-            buscaExata: "nao",
-            txt: "Pesquisa+Radical",
-            marca: marca,
-            classeInter: "",
-            registerPerPage: "29",
-            Action: "searchMarca",
-            tipoPesquisa: "BY_MARCA_CLASSIF_BASICA"
+        const searchData = new URLSearchParams({
+             js_pesquisa: 'M',
+             expression: 'simple',
+             operation: 'contain',
+             pagina: '1',
+             buscaExata: 'nao',
+             txt: 'Pesquisa+Radical',
+             marca: marca,
+             classeInter: "",
+             registerPerPage: "29", // Max appears to be 29
+             Action: "searchMarca",
+             tipoPesquisa: "BY_MARCA_CLASSIF_BASICA"
         });
 
         let response = await client.post(searchUrl, searchData.toString(), { headers });
         let content = response.data as string;
         const totalPages = extractTotalPages(content);
         let currentPage = 1;
+        console.log(`Total pages found: ${totalPages}`);
 
         while (currentPage <= totalPages) {
+            console.log(`Scraping page ${currentPage} of ${totalPages}...`);
             if (currentPage > 1) {
                 const pageData = new URLSearchParams({ Action: "nextPageMarca", page: currentPage.toString() });
                 try {
@@ -149,15 +195,19 @@ async function scrapeAllInpiData(marca: string): Promise<InpiScraperResults> {
             const rows = content.match(tableRowsPattern);
 
             if (rows) {
-                for (const rowHtml of rows) {
+                 console.log(`Found ${rows.length} rows on page ${currentPage}.`);
+                 for (const rowHtml of rows) {
                     const columnsRegex = /<td.*?>([\s\S]*?)<\/td>/g;
                     const columns: string[] = [];
                     let colMatch: RegExpExecArray | null = columnsRegex.exec(rowHtml);
                     while (colMatch !== null) {
-                        columns.push(colMatch[1].replace(/\u00A0/g, ' ').trim());
+                        columns.push(colMatch[1].replace(/\u00A0/g, ' ').trim()); // Replace non-breaking spaces
                         colMatch = columnsRegex.exec(rowHtml);
                     }
-                    if (columns.length < 8) continue;
+                    if (columns.length < 8) {
+                        console.warn("Skipping row with less than 8 columns:", rowHtml);
+                        continue;
+                    }
 
                     let numero: string | null = null;
                     let url: string | null = null;
@@ -186,9 +236,15 @@ async function scrapeAllInpiData(marca: string): Promise<InpiScraperResults> {
                         URL: url,
                     });
                 }
+            } else {
+                 console.log(`No rows found on page ${currentPage}.`);
             }
 
-             if (currentPage < totalPages && !(/Próxima»<\/a>/.test(content))) break; // Stop if next link isn't there
+            // Check if the 'Próxima' link exists before incrementing
+            if (currentPage < totalPages && !(content.includes('>Próxima»</a>'))) {
+                console.warn(`'Próxima' link not found on page ${currentPage} despite totalPages being ${totalPages}. Stopping pagination.`);
+                break; // Stop if next link isn't there but we expect more pages
+            }
             currentPage++;
         }
     } catch (error: any) {
@@ -197,99 +253,6 @@ async function scrapeAllInpiData(marca: string): Promise<InpiScraperResults> {
 
     return { trademarks: allTrademarkData, errors: errors };
 }
-
-
-/**
- * Handler for the `fetch_inpi_data` tool.
- * Scrapes INPI, stores full results in cache, and returns a summary + result_id.
- */
-async function fetchInpiDataHandler(step: FetchInpiDataInput): Promise<InpiFetchSummary> {
-    console.log(`Starting INPI fetch for marca: ${step.marca}`);
-    const results = await scrapeAllInpiData(step.marca);
-    const resultId = ThreadStore.addInpiResults(results.trademarks); // Store full results
-
-    let summary = `Found ${results.trademarks.length} trademark(s).`;
-    if (results.errors.length > 0) {
-        summary += ` Encountered errors: ${results.errors.join(', ')}`;
-    }
-
-    console.log(`INPI fetch complete for ${step.marca}. Result ID: ${resultId}, Summary: ${summary}`);
-    return {
-        result_id: resultId,
-        summary: summary,
-    };
-}
-
-/**
- * Handler for the `filter_inpi_results` tool.
- * Retrieves cached results and filters them based on criteria.
- */
-async function filterInpiResultsHandler(step: FilterInpiResultsInput): Promise<InpiScraperResults> {
-    console.log(`Filtering INPI results for ID: ${step.result_id} with criteria:`, {
-        situacao: step.situacao,
-        titular: step.titular,
-        classe_ncl: step.classe_ncl
-    });
-    const cachedResults = ThreadStore.getInpiResults(step.result_id);
-
-    if (!cachedResults) {
-        console.error(`No cached results found for ID: ${step.result_id}`);
-        return { trademarks: [], errors: [`No cached results found for ID: ${step.result_id}`] };
-    }
-
-    const filtered = cachedResults.filter(t => {
-        let match = true;
-        if (step.situacao && t.Situacao?.toLowerCase() !== step.situacao.toLowerCase()) {
-            match = false;
-        }
-        if (step.titular && !t.Titular?.toLowerCase().includes(step.titular.toLowerCase())) {
-            match = false;
-        }
-        if (step.classe_ncl && !t.Classes?.some(c => c.toLowerCase() === step.classe_ncl?.toLowerCase())) {
-            match = false;
-        }
-        return match;
-    });
-
-    console.log(`Filtering complete for ID: ${step.result_id}. Found ${filtered.length} matching trademarks.`);
-    return { trademarks: filtered, errors: [] }; // Return filtered results
-}
-
-/**
- * Handler for the `get_inpi_details` tool.
- * Retrieves a specific trademark entry from cached results by its Numero.
- */
-async function getInpiDetailsHandler(step: GetInpiDetailsInput): Promise<TrademarkEntry | { error: string }> {
-    console.log(`Getting INPI details for ID: ${step.result_id}, Numero: ${step.numero}`);
-    const cachedResults = ThreadStore.getInpiResults(step.result_id);
-
-    if (!cachedResults) {
-        console.error(`No cached results found for ID: ${step.result_id}`);
-        return { error: `No cached results found for ID: ${step.result_id}` };
-    }
-
-    const found = cachedResults.find(t => t.Numero === step.numero);
-
-    if (!found) {
-        console.warn(`Trademark with Numero ${step.numero} not found in results ID: ${step.result_id}`);
-        return { error: `Trademark with Numero ${step.numero} not found in results.` };
-    }
-
-    console.log(`Details found for Numero ${step.numero} in results ID: ${step.result_id}.`);
-    return found; // Return the specific entry
-}
-
-
-// Export the handler map for registration in assistant.ts
-// Includes the new handlers.
-export const inpiToolHandlers = {
-  fetch_inpi_data: fetchInpiDataHandler,
-  filter_inpi_results: filterInpiResultsHandler,
-  get_inpi_details: getInpiDetailsHandler,
-  find_most_recent_trademark: findMostRecentTrademarkHandler, // Add new handler
-};
-
-// --- Helper function for date parsing ---
 
 /**
  * Parses a DD/MM/YYYY string into a Date object or null if invalid.
@@ -323,23 +286,107 @@ function parsePrioridadeDate(dateString: string | null | undefined): Date | null
   return date;
 }
 
+// --- Tool Handlers ---
+
+/**
+ * Handler for the `fetch_inpi_data` tool.
+ * Scrapes INPI, stores full results in cache, and returns a summary + result_id.
+ */
+async function fetchInpiDataHandler(step: FetchInpiDataTool): Promise<InpiFetchSummary> {
+    console.log(`Starting INPI fetch for marca: ${step.marca}`);
+    const results = await scrapeAllInpiData(step.marca);
+    const resultId = ThreadStore.addInpiResults(results.trademarks); // Store full results
+
+    let summary = `Found ${results.trademarks.length} trademark(s).`;
+    if (results.errors.length > 0) {
+        summary += ` Encountered errors: ${results.errors.join(', ')}`;
+    }
+
+    console.log(`INPI fetch complete for ${step.marca}. Result ID: ${resultId}, Summary: ${summary}`);
+    return new InpiFetchSummary(resultId, summary);
+}
+
+/**
+ * Handler for the `filter_inpi_results` tool.
+ * Retrieves cached results and filters them based on criteria.
+ */
+async function filterInpiResultsHandler(step: FilterInpiResultsTool): Promise<InpiFilteredResults | InpiErrorResult> {
+    console.log(`Filtering INPI results for ID: ${step.result_id} with criteria:`, {
+        situacao: step.situacao,
+        titular: step.titular,
+        classe_ncl: step.classe_ncl
+    });
+    const cachedResults = ThreadStore.getInpiResults(step.result_id);
+
+    if (!cachedResults) {
+        const errorMsg = `No cached results found for ID: ${step.result_id}`;
+        console.error(errorMsg);
+        return new InpiErrorResult(errorMsg);
+    }
+
+    const filtered = cachedResults.filter(t => {
+        let match = true;
+        if (step.situacao && t.Situacao?.toLowerCase() !== step.situacao.toLowerCase()) {
+            match = false;
+        }
+        if (step.titular && !t.Titular?.toLowerCase().includes(step.titular.toLowerCase())) {
+            match = false;
+        }
+        // Handle NCL filtering carefully - check if *any* class matches
+        if (step.classe_ncl && !(t.Classes?.some(c => c.toLowerCase() === step.classe_ncl?.toLowerCase()))) {
+             match = false;
+        }
+        return match;
+    });
+
+    console.log(`Filtering complete for ID: ${step.result_id}. Found ${filtered.length} matching trademarks.`);
+    return new InpiFilteredResults(filtered, []); // Return filtered results
+}
+
+/**
+ * Handler for the `get_inpi_details` tool.
+ * Retrieves a specific trademark entry from cached results by its Numero.
+ */
+async function getInpiDetailsHandler(step: GetInpiDetailsTool): Promise<TrademarkEntryResult | InpiErrorResult> {
+    console.log(`Getting INPI details for ID: ${step.result_id}, Numero: ${step.numero}`);
+    const cachedResults = ThreadStore.getInpiResults(step.result_id);
+
+    if (!cachedResults) {
+        const errorMsg = `No cached results found for ID: ${step.result_id}`;
+        console.error(errorMsg);
+        return new InpiErrorResult(errorMsg);
+    }
+
+    const found = cachedResults.find(t => t.Numero === step.numero);
+
+    if (!found) {
+        const errorMsg = `Trademark with Numero ${step.numero} not found in results for ID: ${step.result_id}`;
+        console.warn(errorMsg);
+        return new InpiErrorResult(errorMsg);
+    }
+
+    console.log(`Details found for Numero ${step.numero} in results ID: ${step.result_id}.`);
+    return new TrademarkEntryResult(found); // Return the specific entry
+}
 
 /**
  * Handler for the `find_most_recent_trademark` tool.
  * Retrieves cached results, parses 'Prioridade' dates, and finds the entry with the latest date.
  */
-async function findMostRecentTrademarkHandler(step: { result_id: string }): Promise<TrademarkEntry | { error: string }> {
+async function findMostRecentTrademarkHandler(step: FindMostRecentTrademarkTool): Promise<TrademarkEntryResult | InpiErrorResult> {
     console.log(`Finding most recent trademark for result ID: ${step.result_id}`);
     const cachedResults = ThreadStore.getInpiResults(step.result_id);
 
     if (!cachedResults) {
-        console.error(`No cached results found for ID: ${step.result_id}`);
-        return { error: `No cached results found for ID: ${step.result_id}` };
+        const errorMsg = `No cached results found for ID: ${step.result_id}`;
+        console.error(errorMsg);
+        return new InpiErrorResult(errorMsg);
     }
 
     if (cachedResults.length === 0) {
-        console.warn(`No trademarks found in cached results for ID: ${step.result_id}`);
-        return { error: 'No trademarks found in the results to determine the most recent.' };
+        const errorMsg = 'No trademarks found in the results to determine the most recent.';
+        console.warn(`${errorMsg} (ID: ${step.result_id})`);
+        return new InpiErrorResult(errorMsg);
     }
 
     let mostRecentEntry: TrademarkEntry | null = null;
@@ -348,18 +395,33 @@ async function findMostRecentTrademarkHandler(step: { result_id: string }): Prom
     for (const entry of cachedResults) {
         const currentDate = parsePrioridadeDate(entry.Prioridade);
         if (currentDate) {
-            if (!maxDate || currentDate > maxDate) {
+            if (!maxDate || currentDate.getTime() > maxDate.getTime()) { // Compare time for precision
                 maxDate = currentDate;
                 mostRecentEntry = entry;
             }
+        } else {
+            console.warn(`Skipping entry with unparseable date: ${entry.Numero} - ${entry.Prioridade}`);
         }
     }
 
     if (!mostRecentEntry) {
-        console.warn(`Could not determine the most recent trademark for ID: ${step.result_id} (no valid dates found).`);
-        return { error: `Could not determine the most recent trademark as no valid 'Prioridade' dates were found.` };
+        const errorMsg = `Could not determine the most recent trademark as no valid 'Prioridade' dates were found.`;
+        console.warn(`${errorMsg} (ID: ${step.result_id})`);
+        return new InpiErrorResult(errorMsg);
     }
 
     console.log(`Most recent trademark found for ID ${step.result_id}: Numero ${mostRecentEntry.Numero} with date ${mostRecentEntry.Prioridade}`);
-    return mostRecentEntry;
+    return new TrademarkEntryResult(mostRecentEntry);
 }
+
+
+// Export the handler map for registration in assistant.ts
+export const inpiToolHandlers = {
+  fetch_inpi_data: fetchInpiDataHandler,
+  filter_inpi_results: filterInpiResultsHandler,
+  get_inpi_details: getInpiDetailsHandler,
+  find_most_recent_trademark: findMostRecentTrademarkHandler,
+} as const;
+
+// Export BAML tool types for external use if needed
+export type { FetchInpiDataTool, FilterInpiResultsTool, GetInpiDetailsTool, FindMostRecentTrademarkTool };

@@ -2,7 +2,6 @@ import { b } from "../../baml_client";
 import { calculatorToolHandlers } from "../tools/calculator";
 import { thinkToolHandler } from "../tools/think";
 import { inpiToolHandlers } from "../tools/inpi_fetcher"; // Import INPI handlers
-import type { InpiFetchSummary, InpiScraperResults, TrademarkEntry } from "../tools/inpi_fetcher"; // Import INPI result types
 
 export interface Event {
     type: string;
@@ -36,48 +35,10 @@ export class Thread {
 
         // --- Specific Serialization Logic ---
 
-        // 1. Handle INPI Fetch Summary (tool_response for fetch_inpi_data)
-        if (e.type === 'tool_response' && typeof data === 'object' && data !== null && 'result_id' in data && 'summary' in data && !('trademarks' in data)) {
-             tag = "tool_response"; // Keep original type
-             const summaryData = data as InpiFetchSummary;
-             body = `result_id: ${summaryData.result_id}\nsummary: ${summaryData.summary}`;
-        }
-        // 2. Handle INPI Filtered Results (tool_response for filter_inpi_results)
-        else if (e.type === 'tool_response' && typeof data === 'object' && data !== null && 'trademarks' in data && 'errors' in data) {
-             tag = "tool_response"; // Keep original type
-             const results = data as InpiScraperResults; // Full or filtered results
-             const summary: string[] = [];
-             if (results.trademarks.length > 0) {
-                 summary.push(`Found ${results.trademarks.length} matching trademark(s):`);
-                 // Show details of the filtered results (up to a limit)
-                 for (const t of results.trademarks.slice(0, 5)) { // Show more details for filtered results
-                     summary.push(`- Numero: ${t.Numero ?? 'N/A'}, Marca: ${t.Marca ?? 'N/A'}, Situacao: ${t.Situacao ?? 'N/A'}, Titular: ${t.Titular ?? 'N/A'}`);
-                 }
-                 if (results.trademarks.length > 5) {
-                     summary.push(`... (and ${results.trademarks.length - 5} more)`);
-                 }
-             } else {
-                 summary.push("No trademarks matched the filter criteria.");
-             }
-             if (results.errors.length > 0) {
-                 summary.push(`Errors encountered: ${results.errors.join(', ')}`);
-             }
-             body = summary.join('\n');
-        }
-         // 3. Handle INPI Get Details / Find Most Recent Result (tool_response returning a single TrademarkEntry or error)
-        else if (e.type === 'tool_response' && typeof data === 'object' && data !== null && ('Numero' in data || 'error' in data) && ('Marca' in data || 'error' in data)) { // Heuristic for TrademarkEntry or error object
-             tag = "tool_response";
-             if ('error' in data) {
-                 body = `Error: ${data.error}`; // Generic error message for get_details or find_most_recent
-             } else {
-                 const entry = data as TrademarkEntry;
-                 body = `Details for Numero ${entry.Numero}:\n` +
-                        `  Marca: ${entry.Marca ?? 'N/A'}\n` +
-                        `  Situacao: ${entry.Situacao ?? 'N/A'}\n` +
-                        `  Titular: ${entry.Titular ?? 'N/A'}\n` +
-                        `  Classes: ${entry.Classes?.join(', ') ?? 'N/A'}\n` +
-                        `  URL: ${entry.URL ?? 'N/A'}`;
-             }
+        // Generic serialization for tool_response using toLLMString if available
+        if (e.type === 'tool_response' && data !== null && typeof (data as any).toLLMString === 'function') {
+            tag = "tool_response";
+            body = (data as any).toLLMString();
         }
         // 4. Handle other tool calls (including fetch_inpi_data tool *call*)
         else if (typeof data === 'object' && data !== null && 'intent' in data) {
