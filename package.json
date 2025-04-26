@@ -1,9 +1,9 @@
 {
-  "name": "my-agent",
+  "name": "agent-boilerplate",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "chat": "tsx src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@boundaryml/baml": "^0.85.0",
+    "axios": "^1.9.0",
     "baml": "^0.0.0",
     "express": "^4.21.2",
+    "tough-cookie": "^5.1.2",
     "tsx": "^4.15.0",
     "typescript": "^5.0.0"
   },
