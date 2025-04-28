@@ -1,6 +1,6 @@
 import express from 'express';
 import { Thread, agentLoop } from './agents/assistant';
-import { ThreadStore } from '../src/state';
+import { ThreadStore } from '../lib/state';
 
 const app = express();
 app.use(express.json());

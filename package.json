@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "chat": "tsx src/chat.ts",
+    "chat": "tsx lib/chat.ts",
     "build": "tsc",
     "start": "node dist/chat.js",
     "lint": "eslint . --ext .ts",
