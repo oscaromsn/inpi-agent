@@ -94,18 +94,18 @@ const toolHandlers: Record<string, ToolHandler> = {
     ...inpiToolHandlers, // INPI handlers now include fetch, filter, get, and find_most_recent
 };
 
-async function handleTool(step: any, thread: Thread): Promise<Thread> {
+async function handleTool(step: any, thread: Thread, debug: boolean): Promise<Thread> {
     const handler = toolHandlers[step.intent as string];
     if (handler) {
         try {
             const result = await Promise.resolve(handler(step));
-            console.log(`tool_response for intent [${step.intent}]:`, result);
+            if (debug) console.log(`tool_response for intent [${step.intent}]:`, result);
             thread.events.push({
                 type: "tool_response",
                 data: result,
             });
         } catch (error: any) {
-            console.error(`Error executing tool ${step.intent}:`, error);
+            if (debug) console.error(`Error executing tool ${step.intent}:`, error);
             thread.events.push({
                 type: "tool_error",
                 data: {
@@ -115,7 +115,7 @@ async function handleTool(step: any, thread: Thread): Promise<Thread> {
             });
         }
     } else {
-        console.warn(`Unhandled tool intent: ${step.intent}`);
+        if (debug) console.warn(`Unhandled tool intent: ${step.intent}`);
          thread.events.push({
                 type: "tool_error",
                 data: {
@@ -128,18 +128,20 @@ async function handleTool(step: any, thread: Thread): Promise<Thread> {
 }
 
 // Agent Loop -------------------------------------------------------------------------------
-export async function agentLoop(initialThread: Thread): Promise<Thread> {
+export async function agentLoop(initialThread: Thread, debug = false): Promise<Thread> {
 
     let thread = initialThread;
 
     while (true) {
         const llmContext = thread.serializeForLLM();
-        console.log("--- Sending to LLM ---");
-        console.log(llmContext);
-        console.log("----------------------");
+        if (debug) {
+            console.log("--- Sending to LLM ---");
+            console.log(llmContext);
+            console.log("----------------------");
+        }
 
         const nextStep = await b.DetermineNextStep(llmContext);
-        console.log("LLM Determined Next Step:", nextStep);
+        if (debug) console.log("LLM Determined Next Step:", nextStep);
 
         // Log the tool call *before* execution
         thread.events.push({
@@ -154,7 +156,7 @@ export async function agentLoop(initialThread: Thread): Promise<Thread> {
                 return thread;
             default:
                 // Handle all other tools (calculator, think, fetch_inpi_data, filter_inpi_results, get_inpi_details)
-                thread = await handleTool(nextStep, thread);
+                thread = await handleTool(nextStep, thread, debug);
                 // After handling a tool, the loop continues to determine the *next* step based on the *new* thread state.
                 break;
         }

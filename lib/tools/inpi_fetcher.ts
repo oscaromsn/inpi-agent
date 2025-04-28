@@ -4,6 +4,7 @@ import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
 import { ThreadStore } from "../state"; // Import ThreadStore to access static cache methods
 import type { FetchInpiDataTool, FilterInpiResultsTool, GetInpiDetailsTool, FindMostRecentTrademarkTool } from "../../baml_client"; // Import BAML tool types
+import { getLogLevel } from "../../baml_client/config";
 
 // --- Interfaces for Data Structures ---
 
@@ -176,10 +177,10 @@ async function scrapeAllInpiData(marca: string): Promise<InpiRawResults> {
         let content = response.data as string;
         const totalPages = extractTotalPages(content);
         let currentPage = 1;
-        console.log(`Total pages found: ${totalPages}`);
+        if (getLogLevel() !== "OFF") console.log(`Total pages found: ${totalPages}`);
 
         while (currentPage <= totalPages) {
-            console.log(`Scraping page ${currentPage} of ${totalPages}...`);
+            if (getLogLevel() !== "OFF") console.log(`Scraping page ${currentPage} of ${totalPages}...`);
             if (currentPage > 1) {
                 const pageData = new URLSearchParams({ Action: "nextPageMarca", page: currentPage.toString() });
                 try {
@@ -195,7 +196,7 @@ async function scrapeAllInpiData(marca: string): Promise<InpiRawResults> {
             const rows = content.match(tableRowsPattern);
 
             if (rows) {
-                 console.log(`Found ${rows.length} rows on page ${currentPage}.`);
+                 if (getLogLevel() !== "OFF") console.log(`Found ${rows.length} rows on page ${currentPage}.`);
                  for (const rowHtml of rows) {
                     const columnsRegex = /<td.*?>([\s\S]*?)<\/td>/g;
                     const columns: string[] = [];
@@ -237,7 +238,7 @@ async function scrapeAllInpiData(marca: string): Promise<InpiRawResults> {
                     });
                 }
             } else {
-                 console.log(`No rows found on page ${currentPage}.`);
+                 if (getLogLevel() !== "OFF") console.log(`No rows found on page ${currentPage}.`);
             }
 
             // Check if the 'Próxima' link exists before incrementing
@@ -293,7 +294,7 @@ function parsePrioridadeDate(dateString: string | null | undefined): Date | null
  * Scrapes INPI, stores full results in cache, and returns a summary + result_id.
  */
 async function fetchInpiDataHandler(step: FetchInpiDataTool): Promise<InpiFetchSummary> {
-    console.log(`Starting INPI fetch for marca: ${step.marca}`);
+    if (getLogLevel() !== "OFF") console.log(`Starting INPI fetch for marca: ${step.marca}`);
     const results = await scrapeAllInpiData(step.marca);
     const resultId = ThreadStore.addInpiResults(results.trademarks); // Store full results
 
@@ -302,7 +303,7 @@ async function fetchInpiDataHandler(step: FetchInpiDataTool): Promise<InpiFetchS
         summary += ` Encountered errors: ${results.errors.join(', ')}`;
     }
 
-    console.log(`INPI fetch complete for ${step.marca}. Result ID: ${resultId}, Summary: ${summary}`);
+    if (getLogLevel() !== "OFF") console.log(`INPI fetch complete for ${step.marca}. Result ID: ${resultId}, Summary: ${summary}`);
     return new InpiFetchSummary(resultId, summary);
 }
 
@@ -311,7 +312,7 @@ async function fetchInpiDataHandler(step: FetchInpiDataTool): Promise<InpiFetchS
  * Retrieves cached results and filters them based on criteria.
  */
 async function filterInpiResultsHandler(step: FilterInpiResultsTool): Promise<InpiFilteredResults | InpiErrorResult> {
-    console.log(`Filtering INPI results for ID: ${step.result_id} with criteria:`, {
+    if (getLogLevel() !== "OFF") console.log(`Filtering INPI results for ID: ${step.result_id} with criteria:`, {
         situacao: step.situacao,
         titular: step.titular,
         classe_ncl: step.classe_ncl
@@ -339,7 +340,7 @@ async function filterInpiResultsHandler(step: FilterInpiResultsTool): Promise<In
         return match;
     });
 
-    console.log(`Filtering complete for ID: ${step.result_id}. Found ${filtered.length} matching trademarks.`);
+    if (getLogLevel() !== "OFF") console.log(`Filtering complete for ID: ${step.result_id}. Found ${filtered.length} matching trademarks.`);
     return new InpiFilteredResults(filtered, []); // Return filtered results
 }
 
@@ -348,7 +349,7 @@ async function filterInpiResultsHandler(step: FilterInpiResultsTool): Promise<In
  * Retrieves a specific trademark entry from cached results by its Numero.
  */
 async function getInpiDetailsHandler(step: GetInpiDetailsTool): Promise<TrademarkEntryResult | InpiErrorResult> {
-    console.log(`Getting INPI details for ID: ${step.result_id}, Numero: ${step.numero}`);
+    if (getLogLevel() !== "OFF") console.log(`Getting INPI details for ID: ${step.result_id}, Numero: ${step.numero}`);
     const cachedResults = ThreadStore.getInpiResults(step.result_id);
 
     if (!cachedResults) {
@@ -365,7 +366,7 @@ async function getInpiDetailsHandler(step: GetInpiDetailsTool): Promise<Trademar
         return new InpiErrorResult(errorMsg);
     }
 
-    console.log(`Details found for Numero ${step.numero} in results ID: ${step.result_id}.`);
+    if (getLogLevel() !== "OFF") console.log(`Details found for Numero ${step.numero} in results ID: ${step.result_id}.`);
     return new TrademarkEntryResult(found); // Return the specific entry
 }
 
@@ -374,7 +375,7 @@ async function getInpiDetailsHandler(step: GetInpiDetailsTool): Promise<Trademar
  * Retrieves cached results, parses 'Prioridade' dates, and finds the entry with the latest date.
  */
 async function findMostRecentTrademarkHandler(step: FindMostRecentTrademarkTool): Promise<TrademarkEntryResult | InpiErrorResult> {
-    console.log(`Finding most recent trademark for result ID: ${step.result_id}`);
+    if (getLogLevel() !== "OFF") console.log(`Finding most recent trademark for result ID: ${step.result_id}`);
     const cachedResults = ThreadStore.getInpiResults(step.result_id);
 
     if (!cachedResults) {
@@ -400,7 +401,7 @@ async function findMostRecentTrademarkHandler(step: FindMostRecentTrademarkTool)
                 mostRecentEntry = entry;
             }
         } else {
-            console.warn(`Skipping entry with unparseable date: ${entry.Numero} - ${entry.Prioridade}`);
+            if (getLogLevel() !== "OFF") console.warn(`Skipping entry with unparseable date: ${entry.Numero} - ${entry.Prioridade}`);
         }
     }
 
@@ -410,7 +411,7 @@ async function findMostRecentTrademarkHandler(step: FindMostRecentTrademarkTool)
         return new InpiErrorResult(errorMsg);
     }
 
-    console.log(`Most recent trademark found for ID ${step.result_id}: Numero ${mostRecentEntry.Numero} with date ${mostRecentEntry.Prioridade}`);
+    if (getLogLevel() !== "OFF") console.log(`Most recent trademark found for ID ${step.result_id}: Numero ${mostRecentEntry.Numero} with date ${mostRecentEntry.Prioridade}`);
     return new TrademarkEntryResult(mostRecentEntry);
 }
 
