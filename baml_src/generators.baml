@@ -3,7 +3,7 @@
 // Just ensure that the output_dir is different for each generator.
 generator target {
     // Valid values: "python/pydantic", "typescript", "ruby/sorbet", "rest/openapi"
-    output_type "typescript"
+    output_type "typescript/react"
 
     // Where the generated code will be saved (relative to baml_src/)
     output_dir "../"
