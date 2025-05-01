@@ -12,7 +12,6 @@
   "dependencies": {
     "@boundaryml/baml": "^0.86.1",
     "axios": "^1.9.0",
-    "baml": "^0.0.0",
     "express": "^4.21.2",
     "tough-cookie": "^5.1.2",
     "tsx": "^4.19.4",
