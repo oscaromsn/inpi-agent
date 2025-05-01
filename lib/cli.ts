@@ -32,6 +32,11 @@ export async function cli() {
             const answer: string = await new Promise((resolve) => {
                 readline.question(`${lastEvent.data.message}\n> `, (ans: string) => resolve(ans));
             });
+            if (answer.trim().toLowerCase() === '/exit') {
+                console.log("Goodbye!");
+                readline.close();
+                process.exit(0);
+            }
             thread.events.push({ type: "human_response", data: answer });
             result = await agentLoop(thread, debug);
             lastEvent = result.events.slice(-1)[0];
