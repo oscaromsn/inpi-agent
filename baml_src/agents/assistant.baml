@@ -10,7 +10,7 @@ class DoneForNow {
   intent "done_for_now"
 
   message string @description(#"
-    message to send to the user about the work that was done. 
+    message to send to the user about the work that was done.
   "#)
 }
 
@@ -24,9 +24,9 @@ class DoneForNow {
 // type InpiTools = FetchInpiDataTool | FilterInpiResultsTool | GetInpiDetailsTool | FindMostRecentTrademarkTool; // Assuming definition exists in inpi_fetcher.baml
 
 function DetermineNextStep(
-    thread: string 
+    thread: string
 ) -> HumanTools | CalculatorTools | ThinkTools | InpiTools { // InpiTools now includes the new tool implicitly if defined in the same scope, or explicitly if needed
-    client "openai/gpt-4o"
+    client "google-ai/gemini-2.0-flash"
 
     prompt #"
         {{ _.role("system") }}
