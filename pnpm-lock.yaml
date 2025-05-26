@@ -14,6 +14,9 @@ importers:
       axios:
         specifier: ^1.9.0
         version: 1.9.0
+      axios-cookiejar-support:
+        specifier: ^6.0.2
+        version: 6.0.2(axios@1.9.0)(tough-cookie@5.1.2)
       express:
         specifier: ^5.1.0
         version: 5.1.0
@@ -739,6 +742,10 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  agent-base@7.1.3:
+    resolution: {integrity: sha512-jRR5wdylq8CkOe6hei19GGZnxM6rBGwFl3Bg0YItGDimvjGtAvdZk4Pu6Cl4u4Igsws4a1fd1Vq3ezrhn4KmFw==}
+    engines: {node: '>= 14'}
+
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
 
@@ -776,6 +783,13 @@ packages:
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
+
+  axios-cookiejar-support@6.0.2:
+    resolution: {integrity: sha512-UO/g6DKfVoxnZkZz1NN669bMDjGV3snZnAZGZqIwEd8FdvFI17/rXLyMBm1j1cgtb2O6Jyi4MJ7ll49NPBEMNg==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      axios: '>=0.20.0'
+      tough-cookie: '>=4.0.0'
 
   axios@1.9.0:
     resolution: {integrity: sha512-re4CqKTJaURpzbLHtIi6XpDv20/CnpXOtjRY5/CU32L8gU8ek9UIivcfvSWvmKEngmVbrUtPpdDwWDWL7DNHvg==}
@@ -1280,6 +1294,16 @@ packages:
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
+
+  http-cookie-agent@7.0.1:
+    resolution: {integrity: sha512-lZHFZUdPTw64PdksQac5xbUd4NWjUbyDYnvR//2sbLpcC4UqEUW0x/6O+rDntVzJzJ07QvhtL5XZSC+c5EK+IQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      tough-cookie: ^4.0.0 || ^5.0.0
+      undici: ^7.0.0
+    peerDependenciesMeta:
+      undici:
+        optional: true
 
   http-errors@2.0.0:
     resolution: {integrity: sha512-FtwrG/euBzaEjYeRqOgly7G0qviiXoJWnvEH2Z1plBdXgbyjv34pHTSb9zoeHMyDy33+DWy5Wt9Wo+TURtOYSQ==}
@@ -2886,6 +2910,8 @@ snapshots:
 
   acorn@8.14.1: {}
 
+  agent-base@7.1.3: {}
+
   ajv@6.12.6:
     dependencies:
       fast-deep-equal: 3.1.3
@@ -2921,6 +2947,14 @@ snapshots:
   async@3.2.6: {}
 
   asynckit@0.4.0: {}
+
+  axios-cookiejar-support@6.0.2(axios@1.9.0)(tough-cookie@5.1.2):
+    dependencies:
+      axios: 1.9.0
+      http-cookie-agent: 7.0.1(tough-cookie@5.1.2)
+      tough-cookie: 5.1.2
+    transitivePeerDependencies:
+      - undici
 
   axios@1.9.0:
     dependencies:
@@ -3506,6 +3540,11 @@ snapshots:
       function-bind: 1.1.2
 
   html-escaper@2.0.2: {}
+
+  http-cookie-agent@7.0.1(tough-cookie@5.1.2):
+    dependencies:
+      agent-base: 7.1.3
+      tough-cookie: 5.1.2
 
   http-errors@2.0.0:
     dependencies:
