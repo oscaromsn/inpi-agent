@@ -1,4 +1,4 @@
-import type { AddTool, SubtractTool, MultiplyTool, DivideTool } from "../../baml_client";
+import type { AddTool, DivideTool, MultiplyTool, SubtractTool } from "../../baml_client";
 
 // Define specific result types for calculator operations
 interface CalculationResult {
@@ -40,16 +40,16 @@ function multiply(step: MultiplyTool): CalculationResult {
 }
 
 function divide(step: DivideTool): CalculationResult {
-    if (step.b === 0) {
-        throw new Error("Division by zero is not allowed.");
-    }
-    const result = step.a / step.b;
-    return {
-        type: 'calculation',
-        operation: 'divide',
-        result,
-        toLLMString: () => result.toString(),
-    };
+  if (step.b === 0) {
+    throw new Error("Division by zero is not allowed.");
+  }
+  const result = step.a / step.b;
+  return {
+    type: 'calculation',
+    operation: 'divide',
+    result,
+    toLLMString: () => result.toString(),
+  };
 }
 
 

@@ -25,34 +25,34 @@ function getInpiCache(resultId: string): TrademarkEntry[] | undefined {
 // you can replace this with any simple state management,
 // e.g. redis, sqlite, postgres, etc
 export class ThreadStore {
-    private threads: Map<string, Thread> = new Map();
+  private threads: Map<string, Thread> = new Map();
 
-    create(thread: Thread): string {
-        const id = crypto.randomUUID();
-        this.threads.set(id, thread);
-        return id;
-    }
+  create(thread: Thread): string {
+    const id = crypto.randomUUID();
+    this.threads.set(id, thread);
+    return id;
+  }
 
-    get(id: string): Thread | undefined {
-        return this.threads.get(id);
-    }
+  get(id: string): Thread | undefined {
+    return this.threads.get(id);
+  }
 
-    update(id: string, thread: Thread): void {
-        this.threads.set(id, thread);
-    }
+  update(id: string, thread: Thread): void {
+    this.threads.set(id, thread);
+  }
 
-    // --- INPI Cache Methods ---
-    // These are static methods for simplicity in this example,
-    // allowing handlers to access the cache without needing the store instance.
+  // --- INPI Cache Methods ---
+  // These are static methods for simplicity in this example,
+  // allowing handlers to access the cache without needing the store instance.
 
-    static addInpiResults(results: TrademarkEntry[]): string {
-        const resultId = crypto.randomUUID();
-        setInpiCache(resultId, results);
-        if (getLogLevel() !== 'OFF') console.log(`Cached INPI results under ID: ${resultId}`);
-        return resultId;
-    }
+  static addInpiResults(results: TrademarkEntry[]): string {
+    const resultId = crypto.randomUUID();
+    setInpiCache(resultId, results);
+    if (getLogLevel() !== 'OFF') console.log(`Cached INPI results under ID: ${resultId}`);
+    return resultId;
+  }
 
-    static getInpiResults(resultId: string): TrademarkEntry[] | undefined {
-        return getInpiCache(resultId);
-    }
+  static getInpiResults(resultId: string): TrademarkEntry[] | undefined {
+    return getInpiCache(resultId);
+  }
 }
