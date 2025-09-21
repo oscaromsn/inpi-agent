@@ -11,6 +11,7 @@ CLAUDE.md
 # misc
 .env
 .env.local
+repomix-output.xml
 
 # mac
 .DS_Store
