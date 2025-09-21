@@ -5,11 +5,11 @@
   "packageManager": "bun@1.2.22",
   "scripts": {
     "baml:generate": "bun baml-cli generate",
-    "chat": "tsx lib/chat.ts",
-    "chat -d": "tsx --debug lib/chat.ts",
+    "chat": "bun lib/chat.ts",
+    "chat -d": "bun --debug lib/chat.ts",
     "build": "tsc",
-    "start": "node dist/chat.js",
-    "lint": "eslint . --ext .ts",
+    "start": "bun dist/chat.js",
+    "lint": "biome check",
     "test": "jest"
   },
   "dependencies": {
