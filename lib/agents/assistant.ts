@@ -127,6 +127,72 @@ async function handleTool(step: any, thread: Thread, debug: boolean): Promise<Th
   return thread;
 }
 
+// Streaming Event Types -------------------------------------------------------------------
+export interface StreamEvent {
+  type: 'partial' | 'complete' | 'tool_start' | 'tool_complete' | 'tool_error';
+  data: any;
+}
+
+// Streaming Agent Loop ---------------------------------------------------------------------
+export async function* agentLoopStream(initialThread: Thread, debug = false): AsyncGenerator<StreamEvent, Thread, unknown> {
+  let thread = initialThread;
+
+  while (true) {
+    const llmContext = thread.serializeForLLM();
+    if (debug) {
+      console.log("--- Sending to LLM ---");
+      console.log(llmContext);
+      console.log("----------------------");
+    }
+
+    const stream = b.stream.DetermineNextStep(llmContext);
+    let finalStep: any;
+
+    // Stream partial responses from LLM
+    for await (const partial of stream) {
+      // Only stream messages for intents that have them (done_for_now, request_more_information)
+      if (partial.intent === 'done_for_now' || partial.intent === 'request_more_information') {
+        const partialWithMessage = partial as any;
+        if (partialWithMessage.message) {
+          yield { type: 'partial', data: { message: partialWithMessage.message, intent: partial.intent } };
+        }
+      }
+      finalStep = partial;
+    }
+
+    if (debug) console.log("LLM Determined Next Step:", finalStep);
+
+    // Log the tool call *before* execution
+    thread.events.push({
+      "type": "tool_call",
+      "data": finalStep
+    });
+
+    switch (finalStep.intent) {
+      case "done_for_now":
+      case "request_more_information":
+        // Signal completion with final message
+        yield { type: 'complete', data: finalStep };
+        return thread;
+      default:
+        // Signal tool execution start
+        yield { type: 'tool_start', data: { intent: finalStep.intent } };
+
+        // Handle tool execution
+        thread = await handleTool(finalStep, thread, debug);
+
+        // Signal tool execution complete
+        const lastEvent = thread.events[thread.events.length - 1];
+        if (lastEvent.type === 'tool_response') {
+          yield { type: 'tool_complete', data: { intent: finalStep.intent, result: lastEvent.data } };
+        } else if (lastEvent.type === 'tool_error') {
+          yield { type: 'tool_error', data: { intent: finalStep.intent, error: lastEvent.data } };
+        }
+        break;
+    }
+  }
+}
+
 // Agent Loop -------------------------------------------------------------------------------
 export async function agentLoop(initialThread: Thread, debug = false): Promise<Thread> {
 
