@@ -26,7 +26,7 @@ class DoneForNow {
 function DetermineNextStep(
     thread: string
 ) -> HumanTools | CalculatorTools | ThinkTools | InpiTools { // InpiTools now includes the new tool implicitly if defined in the same scope, or explicitly if needed
-    client "google-ai/gemini-2.0-flash"
+    client "openai/gpt-5-mini"
 
     prompt #"
         {{ _.role("system") }}
