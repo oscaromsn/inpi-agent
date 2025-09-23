@@ -32,3 +32,5 @@ out/
 
 # Ignore node_modules (common for JS/TS projects)
 node_modules/
+.dev/*
+effectful-cli/*
