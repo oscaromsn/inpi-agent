@@ -1,11 +1,7 @@
-import { cli } from "./cli"
-
-async function hello(): Promise<void> {
-  console.log('hello, world!')
-}
+import { cli } from "./cli";
 
 async function main() {
-  await cli()
+  await cli();
 }
 
-main().catch(console.error)
+main().catch(console.error);

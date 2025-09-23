@@ -3,7 +3,7 @@ import { getLogLevel } from "../../baml_client/config";
 
 // Result type for the think tool handler
 interface ThinkResult {
-  type: 'think_result';
+  type: "think_result";
   thought: string;
   toLLMString(): string;
 }
@@ -14,7 +14,7 @@ function think(step: BamlThinkTool): ThinkResult {
   // The actual "thinking" happens in the LLM prompt that generated this.
   // This handler just acknowledges the step was taken and formats the result.
   return {
-    type: 'think_result',
+    type: "think_result",
     thought: step.thought,
     toLLMString: () => "Thinking complete!", // Simple acknowledgement for the LLM context
   };

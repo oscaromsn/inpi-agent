@@ -16,15 +16,18 @@ export class Thread {
   }
 
   serializeForLLM() {
-    return this.events.map(e => this.serializeOneEvent(e)).join("\n\n"); // Add extra newline for clarity
+    return this.events.map((e) => this.serializeOneEvent(e)).join("\n\n"); // Add extra newline for clarity
   }
 
   trimLeadingWhitespace(s: string) {
     // Trim leading/trailing whitespace from the whole block, then indent body
-    const lines = s.trim().split('\n');
+    const lines = s.trim().split("\n");
     const tag = lines[0];
     const closingTag = lines[lines.length - 1];
-    const body = lines.slice(1, -1).map(line => `  ${line.trim()}`).join('\n'); // Indent body
+    const body = lines
+      .slice(1, -1)
+      .map((line) => `  ${line.trim()}`)
+      .join("\n"); // Indent body
     return `${tag}\n${body}\n${closingTag}`;
   }
 
@@ -36,32 +39,49 @@ export class Thread {
     // --- Specific Serialization Logic ---
 
     // Generic serialization for tool_response using toLLMString if available
-    if (e.type === 'tool_response' && data !== null && typeof (data as any).toLLMString === 'function') {
+    if (
+      e.type === "tool_response" &&
+      data !== null &&
+      typeof (data as any).toLLMString === "function"
+    ) {
       tag = "tool_response";
       body = (data as any).toLLMString();
     }
     // 4. Handle other tool calls (including fetch_inpi_data tool *call*)
-    else if (typeof data === 'object' && data !== null && 'intent' in data) {
+    else if (typeof data === "object" && data !== null && "intent" in data) {
       const record = data as Record<string, unknown>;
       // Use intent as tag ONLY if it's not a type we handle specifically above or a core loop type
-      const coreLoopTypes = ['tool_response', 'tool_error', 'human_response', 'user_input', 'tool_call'];
-      if (typeof record.intent === 'string' && !coreLoopTypes.includes(e.type)) {
+      const coreLoopTypes = [
+        "tool_response",
+        "tool_error",
+        "human_response",
+        "user_input",
+        "tool_call",
+      ];
+      if (
+        typeof record.intent === "string" &&
+        !coreLoopTypes.includes(e.type)
+      ) {
         tag = record.intent;
       } else {
         tag = e.type; // Keep original type for tool_call etc.
       }
 
       const entries = Object.keys(record)
-        .filter((k): boolean => k !== 'intent') // Don't repeat intent in body if used as tag
+        .filter((k): boolean => k !== "intent") // Don't repeat intent in body if used as tag
         .map((k): string => {
           const value = record[k];
-          if (typeof value === 'object' && value !== null) {
-            try { return `${k}: ${JSON.stringify(value)}`; } catch { return `${k}: [Unserializable Object]`; }
+          if (typeof value === "object" && value !== null) {
+            try {
+              return `${k}: ${JSON.stringify(value)}`;
+            } catch {
+              return `${k}: [Unserializable Object]`;
+            }
           }
           return `${k}: ${String(value)}`;
         });
       body = entries.join("\n");
-      if (entries.length === 0 && typeof record.intent === 'string') {
+      if (entries.length === 0 && typeof record.intent === "string") {
         body = `(No parameters for intent: ${record.intent})`; // Handle tools with no params
       }
     }
@@ -94,12 +114,17 @@ const toolHandlers: Record<string, ToolHandler> = {
   ...inpiToolHandlers, // INPI handlers now include fetch, filter, get, and find_most_recent
 };
 
-async function handleTool(step: any, thread: Thread, debug: boolean): Promise<Thread> {
+async function handleTool(
+  step: any,
+  thread: Thread,
+  debug: boolean
+): Promise<Thread> {
   const handler = toolHandlers[step.intent as string];
   if (handler) {
     try {
       const result = await Promise.resolve(handler(step));
-      if (debug) console.log(`tool_response for intent [${step.intent}]:`, result);
+      if (debug)
+        console.log(`tool_response for intent [${step.intent}]:`, result);
       thread.events.push({
         type: "tool_response",
         data: result,
@@ -129,12 +154,15 @@ async function handleTool(step: any, thread: Thread, debug: boolean): Promise<Th
 
 // Streaming Event Types -------------------------------------------------------------------
 export interface StreamEvent {
-  type: 'partial' | 'complete' | 'tool_start' | 'tool_complete' | 'tool_error';
+  type: "partial" | "complete" | "tool_start" | "tool_complete" | "tool_error";
   data: any;
 }
 
 // Streaming Agent Loop ---------------------------------------------------------------------
-export async function* agentLoopStream(initialThread: Thread, debug = false): AsyncGenerator<StreamEvent, Thread, unknown> {
+export async function* agentLoopStream(
+  initialThread: Thread,
+  debug = false
+): AsyncGenerator<StreamEvent, Thread, unknown> {
   let thread = initialThread;
 
   while (true) {
@@ -151,10 +179,19 @@ export async function* agentLoopStream(initialThread: Thread, debug = false): As
     // Stream partial responses from LLM
     for await (const partial of stream) {
       // Only stream messages for intents that have them (done_for_now, request_more_information)
-      if (partial.intent === 'done_for_now' || partial.intent === 'request_more_information') {
+      if (
+        partial.intent === "done_for_now" ||
+        partial.intent === "request_more_information"
+      ) {
         const partialWithMessage = partial as any;
         if (partialWithMessage.message) {
-          yield { type: 'partial', data: { message: partialWithMessage.message, intent: partial.intent } };
+          yield {
+            type: "partial",
+            data: {
+              message: partialWithMessage.message,
+              intent: partial.intent,
+            },
+          };
         }
       }
       finalStep = partial;
@@ -164,38 +201,47 @@ export async function* agentLoopStream(initialThread: Thread, debug = false): As
 
     // Log the tool call *before* execution
     thread.events.push({
-      "type": "tool_call",
-      "data": finalStep
+      type: "tool_call",
+      data: finalStep,
     });
 
     switch (finalStep.intent) {
       case "done_for_now":
       case "request_more_information":
         // Signal completion with final message
-        yield { type: 'complete', data: finalStep };
+        yield { type: "complete", data: finalStep };
         return thread;
-      default:
+      default: {
         // Signal tool execution start
-        yield { type: 'tool_start', data: { intent: finalStep.intent } };
+        yield { type: "tool_start", data: { intent: finalStep.intent } };
 
         // Handle tool execution
         thread = await handleTool(finalStep, thread, debug);
 
         // Signal tool execution complete
         const lastEvent = thread.events[thread.events.length - 1];
-        if (lastEvent.type === 'tool_response') {
-          yield { type: 'tool_complete', data: { intent: finalStep.intent, result: lastEvent.data } };
-        } else if (lastEvent.type === 'tool_error') {
-          yield { type: 'tool_error', data: { intent: finalStep.intent, error: lastEvent.data } };
+        if (lastEvent.type === "tool_response") {
+          yield {
+            type: "tool_complete",
+            data: { intent: finalStep.intent, result: lastEvent.data },
+          };
+        } else if (lastEvent.type === "tool_error") {
+          yield {
+            type: "tool_error",
+            data: { intent: finalStep.intent, error: lastEvent.data },
+          };
         }
         break;
+      }
     }
   }
 }
 
 // Agent Loop -------------------------------------------------------------------------------
-export async function agentLoop(initialThread: Thread, debug = false): Promise<Thread> {
-
+export async function agentLoop(
+  initialThread: Thread,
+  debug = false
+): Promise<Thread> {
   let thread = initialThread;
 
   while (true) {
@@ -211,8 +257,8 @@ export async function agentLoop(initialThread: Thread, debug = false): Promise<T
 
     // Log the tool call *before* execution
     thread.events.push({
-      "type": "tool_call",
-      "data": nextStep
+      type: "tool_call",
+      data: nextStep,
     });
 
     switch (nextStep.intent) {

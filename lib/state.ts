@@ -1,7 +1,7 @@
-import * as crypto from 'node:crypto';
-import { getLogLevel } from '../baml_client/config';
-import type { Thread } from './agents/assistant';
-import type { TrademarkEntry } from './tools/inpi_fetcher'; // Import TrademarkEntry type
+import * as crypto from "node:crypto";
+import { getLogLevel } from "../baml_client/config";
+import type { Thread } from "./agents/assistant";
+import type { TrademarkEntry } from "./tools/inpi_fetcher"; // Import TrademarkEntry type
 
 // Simple in-memory cache for INPI results
 // In a production system, consider Redis, a database, or a dedicated cache store
@@ -13,14 +13,14 @@ function setInpiCache(resultId: string, results: TrademarkEntry[]) {
   // Simple TTL mechanism
   setTimeout(() => {
     inpiCache.delete(resultId);
-    if (getLogLevel() !== 'OFF') console.log(`Expired INPI cache for result ID: ${resultId}`);
+    if (getLogLevel() !== "OFF")
+      console.log(`Expired INPI cache for result ID: ${resultId}`);
   }, CACHE_TTL_MS);
 }
 
 function getInpiCache(resultId: string): TrademarkEntry[] | undefined {
   return inpiCache.get(resultId);
 }
-
 
 // you can replace this with any simple state management,
 // e.g. redis, sqlite, postgres, etc
@@ -48,7 +48,8 @@ export class ThreadStore {
   static addInpiResults(results: TrademarkEntry[]): string {
     const resultId = crypto.randomUUID();
     setInpiCache(resultId, results);
-    if (getLogLevel() !== 'OFF') console.log(`Cached INPI results under ID: ${resultId}`);
+    if (getLogLevel() !== "OFF")
+      console.log(`Cached INPI results under ID: ${resultId}`);
     return resultId;
   }
 

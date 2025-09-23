@@ -1,18 +1,18 @@
 // cli.ts lets you invoke the agent loop from the command line
 
 import { setLogLevel } from "../baml_client/config";
-import { agentLoop, agentLoopStream, Event, StreamEvent, Thread } from "./agents/assistant";
+import { agentLoopStream, Thread } from "./agents/assistant";
 
 export async function cli() {
-  const readline = require('node:readline').createInterface({
+  const readline = require("node:readline").createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stdout,
   });
   const args = process.argv.slice(2);
-  const debug = args.includes('-d') || args.includes('--debug');
+  const debug = args.includes("-d") || args.includes("--debug");
   // Determine BAML log level: environment var BAML_LOG overrides debug flag
   const envLevel = process.env.BAML_LOG;
-  const logLevel = envLevel ? envLevel.toUpperCase() : (debug ? 'INFO' : 'OFF');
+  const logLevel = envLevel ? envLevel.toUpperCase() : debug ? "INFO" : "OFF";
   setLogLevel(logLevel);
   const thread = new Thread([]);
   console.log("Type your message (type '/exit' to quit):");
@@ -20,7 +20,7 @@ export async function cli() {
     const message: string = await new Promise((resolve) => {
       readline.question("> ", (answer: string) => resolve(answer));
     });
-    if (message.trim().toLowerCase() === '/exit') {
+    if (message.trim().toLowerCase() === "/exit") {
       console.log("Goodbye!");
       readline.close();
       process.exit(0);
@@ -31,11 +31,8 @@ export async function cli() {
 
     // Handle follow-up clarification requests
     while (lastEvent.data.intent === "request_more_information") {
-      const answer: string = await new Promise((resolve) => {
-        // Message was already streamed, just show the prompt
-        readline.question(`> `, (ans: string) => resolve(ans));
-      });
-      if (answer.trim().toLowerCase() === '/exit') {
+      const answer = await askHuman(lastEvent.data.message);
+      if (answer.trim().toLowerCase() === "/exit") {
         console.log("Goodbye!");
         readline.close();
         process.exit(0);
@@ -47,8 +44,12 @@ export async function cli() {
   }
 }
 
-async function handleStreamingAgentLoop(thread: Thread, debug: boolean, readline: any): Promise<Thread> {
-  let previousMessage = '';
+async function handleStreamingAgentLoop(
+  thread: Thread,
+  debug: boolean,
+  _readline: any
+): Promise<Thread> {
+  let previousMessage = "";
   let isToolExecuting = false;
 
   const generator = agentLoopStream(thread, debug);
@@ -58,7 +59,7 @@ async function handleStreamingAgentLoop(thread: Thread, debug: boolean, readline
     const event = result.value;
 
     switch (event.type) {
-      case 'partial':
+      case "partial":
         if (event.data.message) {
           // Only output the new part of the message
           const newContent = event.data.message.slice(previousMessage.length);
@@ -69,10 +70,10 @@ async function handleStreamingAgentLoop(thread: Thread, debug: boolean, readline
         }
         break;
 
-      case 'tool_start':
+      case "tool_start":
         if (!debug) {
           // Ensure we're on a new line before showing tool execution
-          if (previousMessage && !previousMessage.endsWith('\n')) {
+          if (previousMessage && !previousMessage.endsWith("\n")) {
             console.log();
           }
           console.log(`🔧 Executing ${event.data.intent}...`);
@@ -80,23 +81,25 @@ async function handleStreamingAgentLoop(thread: Thread, debug: boolean, readline
         isToolExecuting = true;
         break;
 
-      case 'tool_complete':
+      case "tool_complete":
         if (!debug && isToolExecuting) {
           console.log(`✅ ${event.data.intent} completed`);
         }
         isToolExecuting = false;
         break;
 
-      case 'tool_error':
+      case "tool_error":
         if (!debug && isToolExecuting) {
-          console.log(`❌ ${event.data.intent} failed: ${event.data.error.message}`);
+          console.log(
+            `❌ ${event.data.intent} failed: ${event.data.error.message}`
+          );
         }
         isToolExecuting = false;
         break;
 
-      case 'complete':
+      case "complete":
         // Ensure we end on a new line if there was streaming content
-        if (previousMessage && !previousMessage.endsWith('\n')) {
+        if (previousMessage && !previousMessage.endsWith("\n")) {
           console.log();
         }
         break;
@@ -109,10 +112,10 @@ async function handleStreamingAgentLoop(thread: Thread, debug: boolean, readline
   return result.value;
 }
 
-async function askHuman(message: string) {
-  const readline = require('node:readline').createInterface({
+async function askHuman(message: string): Promise<string> {
+  const readline = require("node:readline").createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stdout,
   });
 
   return new Promise((resolve) => {

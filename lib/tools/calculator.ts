@@ -1,9 +1,14 @@
-import type { AddTool, DivideTool, MultiplyTool, SubtractTool } from "../../baml_client";
+import type {
+  AddTool,
+  DivideTool,
+  MultiplyTool,
+  SubtractTool,
+} from "../../baml_client";
 
 // Define specific result types for calculator operations
 interface CalculationResult {
-  type: 'calculation';
-  operation: 'add' | 'subtract' | 'multiply' | 'divide';
+  type: "calculation";
+  operation: "add" | "subtract" | "multiply" | "divide";
   result: number;
   toLLMString(): string; // Method for LLM serialization
 }
@@ -12,8 +17,8 @@ interface CalculationResult {
 function add(step: AddTool): CalculationResult {
   const result = step.a + step.b;
   return {
-    type: 'calculation',
-    operation: 'add',
+    type: "calculation",
+    operation: "add",
     result,
     toLLMString: () => result.toString(), // Simple number serialization
   };
@@ -22,8 +27,8 @@ function add(step: AddTool): CalculationResult {
 function subtract(step: SubtractTool): CalculationResult {
   const result = step.a - step.b;
   return {
-    type: 'calculation',
-    operation: 'subtract',
+    type: "calculation",
+    operation: "subtract",
     result,
     toLLMString: () => result.toString(),
   };
@@ -32,8 +37,8 @@ function subtract(step: SubtractTool): CalculationResult {
 function multiply(step: MultiplyTool): CalculationResult {
   const result = step.a * step.b;
   return {
-    type: 'calculation',
-    operation: 'multiply',
+    type: "calculation",
+    operation: "multiply",
     result,
     toLLMString: () => result.toString(),
   };
@@ -45,13 +50,12 @@ function divide(step: DivideTool): CalculationResult {
   }
   const result = step.a / step.b;
   return {
-    type: 'calculation',
-    operation: 'divide',
+    type: "calculation",
+    operation: "divide",
     result,
     toLLMString: () => result.toString(),
   };
 }
-
 
 // Map of intent -> handler for registration in the main agent.
 export const calculatorToolHandlers = {
