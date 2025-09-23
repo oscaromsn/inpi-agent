@@ -1,5 +1,12 @@
 # INPI-Agent
 
+![WARNING] Refactoring in progress - let's rewrite it in Effect! Actually, the ultimate goal here is take the best of both worlds: BAML for the LLM-facing and prompt engineering part and Effect for orchestration and basically everything else. Let's see how far it goes!
+
+Aknowledges:
+
+- [Kit Langton](https://www.youtube.com/@kitlangton) for his enlightening videos, specially this [one](https://www.youtube.com/watch?v=aueu9lm2ubo) on how to implement "Claude Code" in less than 150 lines of code.
+
+
 ## Descrição
 
 Este projeto contém um agente de inteligência artificial bem simples que tem duas ferramentas: calculadora e acesso à base de dados do Instituto Nacional de Propriedade Intelectual (INPI).
@@ -32,7 +39,7 @@ Isso, porque BAML apresenta paradigmas relevantes tanto para quem está buscando
 - Node
 - Git
 
-Caso você precise de ajuda para configurar o ambiente acima, você pode seguir as instruções presentes [aqui](https://www.perplexity.ai/search/instalar-node-no-windows-usand-2IxkJGjETr.yT3WBExh4.g) 
+Caso você precise de ajuda para configurar o ambiente acima, você pode seguir as instruções presentes [aqui](https://www.perplexity.ai/search/instalar-node-no-windows-usand-2IxkJGjETr.yT3WBExh4.g)
 
 Por enquanto o ambiente para testagem está disponível apenas para VSCode e existe um [syntax highlighter](https://github.com/klepp0/nvim-baml-syntax) criado pela comunidade para Neovim. Suporte para JetBrains e Zed devem vir no futuro.
 
